@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VPN Клиент - Telegram Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a2a6c, #2a4d69, #4b86b4);
+            color: white;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #ccc;
+            margin-bottom: 30px;
+        }
+        
+        .status-container {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        
+        .status-label {
+            font-weight: 600;
+            color: #a0aec0;
+        }
+        
+        .status-value {
+            font-weight: 600;
+        }
+        
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .btn {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .btn-connect {
+            background: #2ecc71;
+            color: white;
+        }
+        
+        .btn-disconnect {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-refresh {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .server-selector {
+            margin: 20px 0;
+        }
+        
+        select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        
+        option {
+            background: #2c3e50;
+            color: white;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 VPN Клиент</h1>
+        <p class="subtitle">Безопасное подключение к интернету</p>
+        
+        <div class="server-selector">
+            <label for="server-select">Выберите сервер:</label>
+            <select id="server-select">
+                <option value="US-East">US-East (Нью-Йорк) - 25мс</option>
+                <option value="US-West">US-West (Лос-Анджелес) - 45мс</option>
+                <option value="Europe">Europe (Франкфурт) - 80мс</option>
+                <option value="Asia">Asia (Токио) - 120мс</option>
+                <option value="Australia">Australia (Сидней) - 180мс</option>
+            </select>
+        </div>
+        
+        <div class="button-group">
+            <button id="connect-btn" class="btn btn-connect">🔌 Подключиться</button>
+            <button id="disconnect-btn" class="btn btn-disconnect" disabled>🔌 Отключиться</button>
+            <button id="refresh-btn" class="btn btn-refresh">🔄 Обновить статус</button>
+        </div>
+        
+        <div id="status-container" class="status-container">
+            <h3>Статус подключения</h3>
+            <div id="status-content">
+                <div class="status-item">
+                    <span class="status-label">Подключен:</span>
+                    <span id="connected-status" class="status-value">❌ Нет</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Сервер:</span>
+                    <span id="server-status" class="status-value">N/A</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">IP-адрес:</span>
+                    <span id="ip-status" class="status-value">N/A</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Время подключения:</span>
+                    <span id="time-status" class="status-value">N/A</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading hidden">
+            <p>Обработка запроса...</p>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация Telegram Web App
+        const tg = window.Telegram.WebApp;
+        
+        // Установка цвета темы
+        document.body.style.backgroundColor = tg.backgroundColor;
+        
+        // Инициализация приложения
+        tg.ready();
+        
+        // Получение данных пользователя
+        const user = tg.initDataUnsafe?.user;
+        const userId = user?.id;
+        
+        if (!userId) {
+            alert('Не удалось получить данные пользователя');
+        }
+        
+        // Базовый URL бэкенда
+        const BACKEND_URL = 'http://localhost:5000'; // В продакшене заменить на реальный URL
+        
+        // DOM элементы
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const serverSelect = document.getElementById('server-select');
+        const connectedStatus = document.getElementById('connected-status');
+        const serverStatus = document.getElementById('server-status');
+        const ipStatus = document.getElementById('ip-status');
+        const timeStatus = document.getElementById('time-status');
+        const loadingElement = document.getElementById('loading');
+        
+        // Функция для показа/скрытия загрузки
+        function setLoading(isLoading) {
+            if (isLoading) {
+                loadingElement.classList.remove('hidden');
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = true;
+                refreshBtn.disabled = true;
+            } else {
+                loadingElement.classList.add('hidden');
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = false;
+                refreshBtn.disabled = false;
+            }
+        }
+        
+        // Функция для обновления статуса
+        async function updateStatus() {
+            if (!userId) return;
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/users/${userId}/status`);
+                const data = await response.json();
+                
+                if (data.connected) {
+                    connectedStatus.textContent = '✅ Да';
+                    connectedStatus.style.color = '#2ecc71';
+                    serverStatus.textContent = data.server;
+                    ipStatus.textContent = data.ip_address;
+                    timeStatus.textContent = data.connection_time ? new Date(data.connection_time).toLocaleString() : 'N/A';
+                    
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                } else {
+                    connectedStatus.textContent = '❌ Нет';
+                    connectedStatus.style.color = '#e74c3c';
+                    serverStatus.textContent = 'N/A';
+                    ipStatus.textContent = 'N/A';
+                    timeStatus.textContent = 'N/A';
+                    
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                }
+            } catch (error) {
+                console.error('Ошибка при обновлении статуса:', error);
+                alert('Ошибка при обновлении статуса');
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        // Функция для подключения
+        async function connect() {
+            if (!userId) return;
+            
+            const server = serverSelect.value;
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/users/${userId}/connect`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ server })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    tg.showAlert(`Успешно подключено к ${data.server}!`);
+                    await updateStatus();
+                } else {
+                    tg.showAlert('Ошибка при подключении к VPN');
+                }
+            } catch (error) {
+                console.error('Ошибка при подключении:', error);
+                tg.showAlert('Ошибка при подключении к VPN');
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        // Функция для отключения
+        async function disconnect() {
+            if (!userId) return;
+            
+            setLoading(true);
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/users/${userId}/disconnect`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    tg.showAlert('Успешно отключено от VPN!');
+                    await updateStatus();
+                } else {
+                    tg.showAlert('Ошибка при отключении от VPN');
+                }
+            } catch (error) {
+                console.error('Ошибка при отключении:', error);
+                tg.showAlert('Ошибка при отключении от VPN');
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        // Обработчики событий
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        refreshBtn.addEventListener('click', updateStatus);
+        
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', updateStatus);
+        
+        // Обновление статуса каждые 10 секунд
+        setInterval(updateStatus, 10000);
+    </script>
+</body>
+</html>
