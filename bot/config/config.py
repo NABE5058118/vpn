@@ -14,13 +14,13 @@ class BotConfig:
 @dataclass
 class BackendConfig:
     """Конфигурация бэкенда"""
-    url: str = os.getenv('BACKEND_URL', 'http://localhost:5000')
+    url: str = os.getenv('BACKEND_URL', 'http://23.134.216.190:5000')
     api_version: str = os.getenv('API_VERSION', 'v1')
 
 @dataclass
 class WebAppConfig:
     """Конфигурация Web App"""
-    url: str = os.getenv('MINI_APP_URL', 'http://localhost:5000/miniapp')
+    url: str = os.getenv('MINI_APP_URL', 'http://23.134.216.190:5000/miniapp')
 
 # Создание экземпляров конфигурации
 bot_config = BotConfig()
